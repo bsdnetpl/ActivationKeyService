@@ -11,23 +11,35 @@ namespace ActivationKeyService.Mutation
     {
     public class Mutation
         {
+        /// <summary>
+        /// Generuje nowy klucz aktywacyjny i zapisuje go w bazie
+        /// </summary>
         public async Task<ActivationKey> GenerateActivationKey(string productName, [Service] AppDbContext dbContext)
             {
             string activationKey = GenerateKey();
 
             using var rsa = RSA.Create();
 
-            // Wczytanie zawartości pliku private.pem
-            string privateKeyPem = File.ReadAllText("KEY/private.pem");
+            // Ścieżka do klucza prywatnego
+            string privateKeyPath = System.IO.Path.Combine("KEY", "private.pem");
 
-            // Import klucza, sprawdzając poprawność
+
+            // Sprawdzenie, czy plik istnieje
+            if (!File.Exists(privateKeyPath))
+                {
+                throw new Exception($"Błąd: Plik klucza {privateKeyPath} nie istnieje.");
+                }
+
+            // Wczytanie klucza prywatnego
+            string privateKeyPem;
             try
                 {
+                privateKeyPem = File.ReadAllText(privateKeyPath).Trim();
                 rsa.ImportFromPem(privateKeyPem);
                 }
-            catch (ArgumentException)
+            catch (Exception ex)
                 {
-                throw new Exception("Błąd: Nieprawidłowy format klucza RSA w private.pem.");
+                throw new Exception("Błąd: Nieprawidłowy format klucza RSA w private.pem.", ex);
                 }
 
             // Generowanie podpisu
@@ -42,6 +54,7 @@ namespace ActivationKeyService.Mutation
                 CreatedAt = DateTime.UtcNow
                 };
 
+            // Zapisywanie do bazy
             try
                 {
                 dbContext.ActivationKeys.Add(newKey);
@@ -50,7 +63,7 @@ namespace ActivationKeyService.Mutation
             catch (DbUpdateException ex)
                 {
                 Console.WriteLine("Błąd zapisu do bazy danych: " + ex.InnerException?.Message);
-                throw;
+                throw new Exception("Błąd zapisu klucza do bazy danych.", ex);
                 }
 
             return newKey;
@@ -62,7 +75,7 @@ namespace ActivationKeyService.Mutation
         private string GenerateKey()
             {
             const string chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-            var random = new Random();
+            var random = new Random(Guid.NewGuid().GetHashCode()); // Lepsze losowanie
             var sb = new StringBuilder();
 
             for (int i = 0; i < 25; i++)
