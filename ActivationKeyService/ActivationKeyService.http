@@ -1,0 +1,6 @@
+@ActivationKeyService_HostAddress = http://localhost:5263
+
+GET {{ActivationKeyService_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
